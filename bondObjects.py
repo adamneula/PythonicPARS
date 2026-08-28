@@ -26,3 +26,11 @@ class bondObjects:
         if isinstance(other, bondObjects):
             return self.cusip == other.cusip
         return False
+
+    def calculate_analytics(self, fedTaxRate: int = 0, stateTaxRate: int = 0) -> None:
+        '''
+        Calculates the analytics for the bond object based on the provided tax rates
+        '''
+        # Placeholder for actual analytics calculations
+        # For example, you might calculate after-tax yield, duration adjustments, etc.
+        pass
