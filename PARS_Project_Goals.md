@@ -37,3 +37,23 @@ PARS is a modular, locally hosted web application designed to analyze prospectiv
   - Expose analysis and aggregation endpoints via FastAPI.
   - Build the React/Next.js interface with Tailwind data tables.
   - Implement report export functionality (PDF generation).
+
+## Data to be included
+**For Muni and Taxible:**
+- Duration Comparison (Range breakdown in pie chart)
+- Maturity Comparison (Range breakdown in pie chart)
+- Option Comparison (Break down callable and not)
+- Revenue Source/Sector Comparison
+- Coupon Rate Comparison
+- Credit Rating Comparison
+- MUNI: State Breakdown & Taxable Equivalent yield for each
+- Top 5 issuer concentration
+- Cash Flow & Annual income Projection
+- Structure Profile
+- Dollar values over percentages (stronger to say you get an extra few thousand a year than a 30 bp improvement)
+- Interest rate shock matrix - Show client how each portfolio acts in extreme cases
+
+**Big Feature: AI Insight**
+- Include a prompt for internal to carry into AI with basic information about entire portfolio to identify a few top credit risks and demonstrate how our portfolio addresses them (could pertain to revenue source, duration, maturity, call risk, etc.)
+- Shifts Internal's workload from manual work/fighting a bad system to higher level research
+- On internal to analyze AI response, validate, and clean up as needed
