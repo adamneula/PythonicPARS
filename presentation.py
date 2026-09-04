@@ -3,22 +3,43 @@ from pptx import Presentation
 from pptx.chart.data import CategoryChartData
 from mappings import MUNI_ISSUE_MAP, CORE_INCOME_BUCKETS, CONSOLIDATED_RATINGS_ORDER
 
-# --- HELPER FUNCTION ---
+# --- HELPER FUNCTIONS ---
+
 def get_shape(slide, shape_name):
+    """Searches ONLY the current slide for a shape by name."""
     for shape in slide.shapes:
         if shape.name == shape_name:
             return shape
-    
     print(f"Warning: Could not find shape '{shape_name}' on this slide.")
     return None
 
-def generate_presentation():
+def update_text_preserve_format(shape, new_text):
+    """
+    Overwrites text in a shape while preserving the exact font, size, 
+    color, and bold/italic styling set in PowerPoint.
+    """
+    if not shape.has_text_frame:
+        return
+    
+    # Text in PowerPoint is stored in Paragraphs, which are made of "Runs".
+    # The formatting (color, size, bold) is attached to the Run.
+    p = shape.text_frame.paragraphs[0]
+    
+    if p.runs:
+        # Overwrite the text of the very first run (keeping its formatting)
+        p.runs[0].text = new_text
+        
+        # Erase the text of any other runs so we don't get leftover letters
+        for run in p.runs[1:]:
+            run.text = ""
+    else:
+        # Fallback if the box was completely empty
+        shape.text = new_text
+
+
+def generate_presentation(advisor_name, client_name="Valued Client"):
     # 1. Load & Clean Data
     df = pd.read_excel("Par_Portfolio_Output.xlsx")
-    
-    # We are using the exact column names found in your Excel file!
-    # (muni_issue_type, muni_purpose, market_value, etc.)
-    
     df['muni_issue_type'] = df['muni_issue_type'].replace(MUNI_ISSUE_MAP)
     
     # 2. Load Template
@@ -30,20 +51,23 @@ def generate_presentation():
     # ========================================================
     print("Populating Slide 1...")
     current_slide = next(slides)
-    name_box = get_shape(current_slide, "ClientName")
-    if name_box:
-        name_box.text = "Adam Neulander"
-    amount_box = get_shape(current_slide, "Strategy + Portfolio Amt")
-    if amount_box:
-        amount_box.text = "$1,000,000"
-    # Example:
-    # title_box = get_shape(current_slide, "Client_Name_Box")
+    client_box = get_shape(current_slide, "ClientName")
+    advisor_box = get_shape(current_slide, "AdvisorName")
+    money_box = get_shape(current_slide, "ValueBox")
+    if client_box:
+        update_text_preserve_format(client_box, f"Prepared for: {client_name}")
+    if advisor_box:
+        update_text_preserve_format(advisor_box, f"Presented by: {advisor_name}")
+    if money_box:
+        total_value = df['market_value'].sum()
+        update_text_preserve_format(money_box, f"${total_value:,.0f}")
 
     # ========================================================
     # SLIDE 2: Income Projections
     # ========================================================
     print("Populating Slide 2...")
     current_slide = next(slides)
+    #TODO: Implement AI insight here appropriately. For now, just a placeholder.
 
     # ========================================================
     # SLIDE 3: Structure Analysis
@@ -51,19 +75,7 @@ def generate_presentation():
     print("Populating Slide 3...")
     current_slide = next(slides)
     
-    # --- PANDAS MATH ---
-    # Group by the lowercase 'muni_issue_type' and sum 'market_value'
-    issue_type_counts = df.groupby('muni_issue_type')['market_value'].sum()
     
-    # Build chart data
-    chart_data_type = CategoryChartData()
-    chart_data_type.categories = issue_type_counts.index.tolist()
-    chart_data_type.add_series('Bond Types', issue_type_counts.values.tolist())
-    
-    # Grab the exact chart on THIS slide and inject!
-    bond_chart_shape = get_shape(current_slide, "Muni_Issue_Chart") 
-    if bond_chart_shape and bond_chart_shape.has_chart:
-        bond_chart_shape.chart.replace_data(chart_data_type)
 
     # ========================================================
     # SLIDE 4: Credit Quality / Ratings
@@ -85,4 +97,4 @@ def generate_presentation():
     print(f"\nDone! Presentation saved to {output_name}")
 
 if __name__ == "__main__":
-    generate_presentation()
+    generate_presentation("Robert Hunt", "Chris Wilbricht")
