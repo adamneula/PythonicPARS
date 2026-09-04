@@ -45,9 +45,14 @@ def export_portfolio_to_excel(portfolio: list[Bond], output_path: str):
     print(f"\nSuccessfully exported all bond data to: {output_path}")
 
 if __name__ == "__main__":
+    import datetime
+    
     # The path to your actual Excel sheet
     EXCEL_PATH = r"H:\_INSTITUTIONAL DIVISION\INTERN FOLDER\Adam Neulander\PythonicPARS\Book1.xlsx"
-    OUTPUT_PATH = r"H:\_INSTITUTIONAL DIVISION\INTERN FOLDER\Adam Neulander\PythonicPARS\Portfolio_Output.xlsx"
+    
+    # Dynamically generate the output name with a timestamp to avoid PermissionErrors
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    OUTPUT_PATH = rf"H:\_INSTITUTIONAL DIVISION\INTERN FOLDER\Adam Neulander\PythonicPARS\Portfolio_Output_{timestamp}.xlsx"
     
     # Run the function
     my_portfolio = load_portfolio_from_excel(EXCEL_PATH, cusip_col_index=0, face_value_col_index=1)

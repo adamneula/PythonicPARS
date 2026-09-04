@@ -47,7 +47,7 @@ class Bond:
         
         # Pull the actual Yield to Worst (using YAS calculated fields first)
         self.yield_to_worst = get_valid_float([
-            "YLD_YTW", "YAS_BOND_YLD", "MUNI_YLD_TO_WORST", 
+            "YLD_CNV_MID", "YLD_YTW", "YAS_BOND_YLD", "MUNI_YLD_TO_WORST", 
             "YLD_YTW_MID", "YLD_YTW_BID", "YLD_TO_WORST"
         ])
         
@@ -59,17 +59,22 @@ class Bond:
         self.is_callable = self.next_call_date != "NC"
         
         # Risk (Duration & Convexity)
-        self.effective_duration = get_valid_float(["DUR_ADJ_MID"])
+        self.effective_duration = get_valid_float(["MID_MOD_DUR_MTY", "DUR_ADJ_MID"])
         self.convexity = get_valid_float(["CNVX_MID"])
         
         # Credit Ratings (Prioritizes Underlying ratings, then Enhanced/Insured, ignores N.S.)
         self.composite_rating = get_valid_rating(["BB_COMPOSITE"])
         self.sp_rating = get_valid_rating(["RTG_SP_UNDERLYING", "RTG_SP_ENHANCED", "RTG_SP_INSURED", "RTG_SP_MUNI_LONG_TERM", "RTG_SP"])
-        self.moodys_rating = get_valid_rating(["RTG_MOODY_UNDERLYING", "RTG_MOODY_ENHANCED", "RTG_MOODY_INSURED", "RTG_MDY_MUNI_LONG_TERM", "RTG_MOODY"])
+        self.moodys_rating = get_valid_rating(["RTG_MDY_LT_UNDL", "RTG_MOODY_ENHANCED", "RTG_MOODY_INSURED", "RTG_MDY_MUNI_LONG_TERM", "RTG_MOODY"])
         self.fitch_rating = get_valid_rating(["RTG_FITCH_ENHANCED", "RTG_FITCH_INSURED", "RTG_FITCH"])
+        self.credit_enhancements = bbg_data.get("CREDIT_ENHANCEMENTS", "N/A")
         
         # Sector, State, and Tax Status
-        self.industry_sector = bbg_data.get("INDUSTRY_SECTOR", "Unknown")
+        self.industry_sector = bbg_data.get("ISSUER_INDUSTRY") or bbg_data.get("INDUSTRY_SECTOR") or "Unknown"
+        self.industry_subgroup = bbg_data.get("INDUSTRY_SUBGROUP", "Unknown")
+        self.muni_issue_type = bbg_data.get("MUNI_ISSUE_TYP") or bbg_data.get("MUNI_BOND_TYP") or "Unknown"
+        self.muni_purpose = bbg_data.get("INDUSTRY_SUBGROUP", "Unknown") # Replaced MUNI_PURPOSE per request
+        self.muni_source = bbg_data.get("MUNI_SOURCE", "Unknown")
         self.state_code = bbg_data.get("STATE_CODE", "Unknown")
         self.tax_provision = bbg_data.get("MUNI_TAX_PROV", "Unknown")
         
