@@ -1,99 +1,88 @@
 import pandas as pd
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
-
-# (Optional) Import your clean mappings
 from mappings import MUNI_ISSUE_MAP, CORE_INCOME_BUCKETS, CONSOLIDATED_RATINGS_ORDER
 
-def generate_presentation(data_path, template_path, output_path):
-    print(f"Loading data from {data_path}...")
+# --- HELPER FUNCTION ---
+def get_shape(slide, shape_name):
+    for shape in slide.shapes:
+        if shape.name == shape_name:
+            return shape
     
-    # 1. Load your Data into Pandas
-    df = pd.read_excel(data_path)
+    print(f"Warning: Could not find shape '{shape_name}' on this slide.")
+    return None
+
+def generate_presentation():
+    # 1. Load & Clean Data
+    df = pd.read_excel("Par_Portfolio_Output.xlsx")
     
-    # --- PANDAS DATA CLEANING (Optional, do this here) ---
-    # df['MUNI_ISSUE_TYP'] = df['MUNI_ISSUE_TYP'].replace(MUNI_ISSUE_MAP)
-    # ... aggregate your dataframes here ...
+    # We are using the exact column names found in your Excel file!
+    # (muni_issue_type, muni_purpose, market_value, etc.)
     
-    print(f"Loading template from {template_path}...")
-    prs = Presentation(template_path)
+    df['muni_issue_type'] = df['muni_issue_type'].replace(MUNI_ISSUE_MAP)
+    
+    # 2. Load Template
+    prs = Presentation("WorkingTemplate.pptx")
+    slides = iter(prs.slides)
 
-    # 2. Loop through every slide in the presentation
-    for slide_index, slide in enumerate(prs.slides):
-        slide_num = slide_index + 1
-        print(f"\n======================================")
-        print(f" Slide {slide_num}")
-        print(f"======================================")
+    # ========================================================
+    # SLIDE 1: Title & Overview
+    # ========================================================
+    print("Populating Slide 1...")
+    current_slide = next(slides)
+    name_box = get_shape(current_slide, "ClientName")
+    if name_box:
+        name_box.text = "Adam Neulander"
+    amount_box = get_shape(current_slide, "Strategy + Portfolio Amt")
+    if amount_box:
+        amount_box.text = "$1,000,000"
+    # Example:
+    # title_box = get_shape(current_slide, "Client_Name_Box")
 
-        # 3. Loop through every element (shape) on the current slide
-        for shape in slide.shapes:
-            print(f"  -> Found Shape: '{shape.name}'")
+    # ========================================================
+    # SLIDE 2: Income Projections
+    # ========================================================
+    print("Populating Slide 2...")
+    current_slide = next(slides)
 
-            # ---------------------------------------------------------
-            # A. IF THE SHAPE IS A CHART (Pie, Bar, Line)
-            # ---------------------------------------------------------
-            if shape.has_chart:
-                print(f"     [Chart Type] Ready to replace data.")
-                
-                # Example Boilerplate for updating a chart:
-                '''
-                if slide_num == 3 and shape.name == "Bond_Type_Chart":
-                    # 1. Prepare the new data
-                    chart_data = CategoryChartData()
-                    chart_data.categories = ['GO', 'Revenue']
-                    chart_data.add_series('Series 1', [50, 50])
-                    
-                    # 2. Inject it into the chart
-                    shape.chart.replace_data(chart_data)
-                '''
+    # ========================================================
+    # SLIDE 3: Structure Analysis
+    # ========================================================
+    print("Populating Slide 3...")
+    current_slide = next(slides)
+    
+    # --- PANDAS MATH ---
+    # Group by the lowercase 'muni_issue_type' and sum 'market_value'
+    issue_type_counts = df.groupby('muni_issue_type')['market_value'].sum()
+    
+    # Build chart data
+    chart_data_type = CategoryChartData()
+    chart_data_type.categories = issue_type_counts.index.tolist()
+    chart_data_type.add_series('Bond Types', issue_type_counts.values.tolist())
+    
+    # Grab the exact chart on THIS slide and inject!
+    bond_chart_shape = get_shape(current_slide, "Muni_Issue_Chart") 
+    if bond_chart_shape and bond_chart_shape.has_chart:
+        bond_chart_shape.chart.replace_data(chart_data_type)
 
-            # ---------------------------------------------------------
-            # B. IF THE SHAPE IS A TEXT BOX
-            # ---------------------------------------------------------
-            elif shape.has_text_frame:
-                # print(f"     [Text] Current text: '{shape.text[:30]}...'")
-                
-                # Example Boilerplate for updating text:
-                '''
-                if shape.name == "Client_Name_Box":
-                    shape.text = "Genter Capital Management"
-                '''
-                pass
+    # ========================================================
+    # SLIDE 4: Credit Quality / Ratings
+    # ========================================================
+    print("Populating Slide 4...")
+    current_slide = next(slides)
 
-            # ---------------------------------------------------------
-            # C. IF THE SHAPE IS A TABLE
-            # ---------------------------------------------------------
-            elif shape.has_table:
-                print(f"     [Table Type] Ready to edit cells.")
-                
-                # Example Boilerplate for updating a table:
-                '''
-                if slide_num == 4 and shape.name == "Holdings_Table":
-                    table = shape.table
-                    # Overwrite the first cell in the first row
-                    table.cell(0, 0).text = "New Value"
-                '''
-
-            # ---------------------------------------------------------
-            # D. OTHER SHAPES (Pictures, Lines, Groups)
-            # ---------------------------------------------------------
-            else:
-                # E.g., shape.shape_type == MSO_SHAPE_TYPE.PICTURE
-                pass
-
-    # 4. Save the populated presentation
-    prs.save(output_path)
-    print(f"\nDone! Presentation saved to {output_path}")
-
+    # ========================================================
+    # SLIDE 5: Duration & Maturity
+    # ========================================================
+    print("Populating Slide 5...")
+    current_slide = next(slides)
+    
+    # ========================================================
+    # SAVE PRESENTATION
+    # ========================================================
+    output_name = "PAR_Report_Output.pptx"
+    prs.save(output_name)
+    print(f"\nDone! Presentation saved to {output_name}")
 
 if __name__ == "__main__":
-    # Define your file paths
-    DATA_FILE = "Par_Portfolio_Output.xlsx"
-    TEMPLATE_FILE = "WorkingTemplate.pptx"
-    OUTPUT_FILE = "PAR_Report_Output.pptx"
-    
-    import os
-    if os.path.exists(TEMPLATE_FILE):
-        generate_presentation(DATA_FILE, TEMPLATE_FILE, OUTPUT_FILE)
-    else:
-        print(f"Error: {TEMPLATE_FILE} not found. Please ensure it is in the current directory.")
+    generate_presentation()
