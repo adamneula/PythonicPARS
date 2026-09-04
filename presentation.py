@@ -74,9 +74,18 @@ def generate_presentation(advisor_name, client_name="Valued Client"):
     # ========================================================
     print("Populating Slide 3...")
     current_slide = next(slides)
-    
-    
+    structure_counts = df.groupby('muni_issue_type')['market_value'].sum()
 
+    structure_chart_data = CategoryChartData()
+    structure_chart_data.categories = [str(label).title() for label in structure_counts.index]
+    structure_chart_data.add_series('Bond Types', structure_counts.values.tolist())
+
+    structure_chart = get_shape(current_slide, "ClientStructureAnalysis")
+    if structure_chart and structure_chart.has_chart:
+        structure_chart.chart.replace_data(structure_chart_data)
+    #PASSED VALIDATION
+
+    
     # ========================================================
     # SLIDE 4: Credit Quality / Ratings
     # ========================================================
