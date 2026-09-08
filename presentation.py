@@ -83,9 +83,18 @@ def generate_presentation(advisor_name, client_name="Valued Client"):
     structure_chart = get_shape(current_slide, "ClientStructureAnalysis")
     if structure_chart and structure_chart.has_chart:
         structure_chart.chart.replace_data(structure_chart_data)
-    #PASSED VALIDATION
-
+    #^PASSED VALIDATION^
     
+    df['muni_source'] = df['muni_source'].str.title()
+    income_counts = df.groupby('muni_source')['market_value'].sum()
+    income_chart_data = CategoryChartData()
+    income_chart_data.categories = income_counts.index.tolist()
+    income_chart_data.add_series('Income Sources', income_counts.values.tolist())
+
+    income_chart = get_shape(current_slide, "ClientIncomeSource")
+    if income_chart and income_chart.has_chart:
+        income_chart.chart.replace_data(income_chart_data)
+
     # ========================================================
     # SLIDE 4: Credit Quality / Ratings
     # ========================================================
