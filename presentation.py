@@ -1,7 +1,7 @@
 import pandas as pd
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
-from mappings import MUNI_ISSUE_MAP, CORE_INCOME_BUCKETS, CONSOLIDATED_RATINGS_ORDER
+from mappings import MUNI_ISSUE_MAP, CORE_INCOME_BUCKETS, CONSOLIDATED_RATINGS_ORDER, MOODYS_TO_SP
 
 # --- HELPER FUNCTIONS ---
 
@@ -36,6 +36,21 @@ def update_text_preserve_format(shape, new_text):
         # Fallback if the box was completely empty
         shape.text = new_text
 
+def synthesize_rating(row):
+    comp = str(row.get('composite_rating', 'NR')).strip()
+    if comp != 'NR' and comp != 'nan': return comp
+        
+    # Fallbacks if composite is NR
+    sp = str(row.get('sp_rating', 'NR')).strip()
+    if sp != 'NR' and sp != 'nan': return sp
+    
+    mdy = str(row.get('moodys_rating', 'NR')).strip()
+    if mdy != 'NR' and mdy != 'nan': return MOODYS_TO_SP.get(mdy, mdy)
+        
+    fitch = str(row.get('fitch_rating', 'NR')).strip()
+    if fitch != 'NR' and fitch != 'nan': return fitch
+    
+    return 'NR'
 
 def generate_presentation(advisor_name, client_name="Valued Client"):
     # 1. Load & Clean Data
@@ -96,17 +111,68 @@ def generate_presentation(advisor_name, client_name="Valued Client"):
         income_chart.chart.replace_data(income_chart_data)
 
     # ========================================================
-    # SLIDE 4: Credit Quality / Ratings
+    # SLIDE 4: Structure Recommendation
     # ========================================================
     print("Populating Slide 4...")
     current_slide = next(slides)
+    structure_counts = df.groupby('muni_issue_type')['market_value'].sum()
+
+    structure_chart_data = CategoryChartData()
+    structure_chart_data.categories = [str(label).title() for label in structure_counts.index]
+    structure_chart_data.add_series('Bond Types', structure_counts.values.tolist())
+
+    structure_chart = get_shape(current_slide, "ClientStructure")
+    if structure_chart and structure_chart.has_chart:
+        structure_chart.chart.replace_data(structure_chart_data)
 
     # ========================================================
-    # SLIDE 5: Duration & Maturity
+    # SLIDE 5: Maturity Analysis
     # ========================================================
     print("Populating Slide 5...")
     current_slide = next(slides)
+
+    # ========================================================
+    # SLIDE 6: Maturity Recommendation
+    # ========================================================
+    print("Populating Slide 6...")
+    current_slide = next(slides)
+
+    # ========================================================
+    # SLIDE 7: Coupon Analysis
+    # ========================================================
+    print("Populating Slide 7...")
+    current_slide = next(slides)
+
+    # ========================================================
+    # SLIDE 8: Credit Quality / Ratings
+    # ========================================================
+    print("Populating Slide 8...")
+    current_slide = next(slides)
+
+    df['syn_rating'] = df.apply(synthesize_rating, axis=1)
+    df['clean_rating'] = df['syn_rating'].str.replace('+', '').str.replace('-', '')
+    ratings_counts = df.groupby('clean_rating')['market_value'].sum()
     
+    ordered_labels = [r for r in CONSOLIDATED_RATINGS_ORDER if r in ratings_counts.index]
+    ratings_counts = ratings_counts.reindex(ordered_labels)
+    
+    chart_data_ratings = CategoryChartData()
+    chart_data_ratings.categories = ratings_counts.index.tolist()
+    chart_data_ratings.add_series('Credit Quality', ratings_counts.values.tolist())
+    
+    ratings_chart_shape = get_shape(current_slide, "ClientQualityBreakdown")
+    if ratings_chart_shape and ratings_chart_shape.has_chart:
+        ratings_chart_shape.chart.replace_data(chart_data_ratings)
+        print("Updated Ratings Chart!")
+
+    #^ Going off industry standard, composite rating or only one (composite exists if 2 or more are filled in)
+
+    # ========================================================
+    # SLIDE 9: State Breakdown Recommendation
+    # ========================================================
+    print("Populating Slide 9...")
+    current_slide = next(slides)
+
     # ========================================================
     # SAVE PRESENTATION
     # ========================================================

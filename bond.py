@@ -65,8 +65,8 @@ class Bond:
         # Credit Ratings (Prioritizes Underlying ratings, then Enhanced/Insured, ignores N.S.)
         self.composite_rating = get_valid_rating(["BB_COMPOSITE"])
         self.sp_rating = get_valid_rating(["RTG_SP_UNDERLYING", "RTG_SP_ENHANCED", "RTG_SP_INSURED", "RTG_SP_MUNI_LONG_TERM", "RTG_SP"])
-        self.moodys_rating = get_valid_rating(["RTG_MDY_LT_UNDL", "RTG_MOODY_ENHANCED", "RTG_MOODY_INSURED", "RTG_MDY_MUNI_LONG_TERM", "RTG_MOODY"])
-        self.fitch_rating = get_valid_rating(["RTG_FITCH_ENHANCED", "RTG_FITCH_INSURED", "RTG_FITCH"])
+        self.moodys_rating = get_valid_rating(["RTG_MDY_UNDERLYING", "RTG_MOODY_ENHANCED", "RTG_MOODY_INSURED", "RTG_MDY_MUNI_LONG_TERM", "RTG_MOODY"])
+        self.fitch_rating = get_valid_rating(["RTG_FITCH_UNDERLYING", "RTG_FITCH_ENHANCED", "RTG_FITCH_INSURED", "RTG_FITCH"])
         self.credit_enhancements = bbg_data.get("CREDIT_ENHANCEMENTS", "N/A")
         
         # Sector, State, and Tax Status
