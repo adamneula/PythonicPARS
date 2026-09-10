@@ -58,6 +58,9 @@ class Bond:
         self.next_call_date = bbg_data.get("NXT_CALL_DT", "NC") # NC = Non-Callable
         self.is_callable = self.next_call_date != "NC"
         
+        # Effective Maturity (Option Adjusted Maturity / Workout Date)
+        self.effective_maturity_date = bbg_data.get("YAS_WORKOUT_DT") or bbg_data.get("WORKOUT_DT") or self.maturity_date
+        
         # Risk (Duration & Convexity)
         self.effective_duration = get_valid_float(["MID_MOD_DUR_MTY", "DUR_ADJ_MID"])
         self.convexity = get_valid_float(["CNVX_MID"])
