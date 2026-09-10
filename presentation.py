@@ -52,7 +52,7 @@ def synthesize_rating(row):
     
     return 'NR'
 
-def generate_presentation(advisor_name, client_name="Valued Client"):
+def generate_presentation(advisor_name, client_name="Valued Client", clientTaxRate=0.408):
     # 1. Load & Clean Data
     df = pd.read_excel("Par_Portfolio_Output.xlsx")
     df['muni_issue_type'] = df['muni_issue_type'].replace(MUNI_ISSUE_MAP)
@@ -235,8 +235,8 @@ def generate_presentation(advisor_name, client_name="Valued Client"):
         elif rate <= 2: return "1%-2%"
         elif rate <= 3: return "2%-3%"
         elif rate <= 4: return "3%-4%"
-        elif rate <= 5: return "4%-5%" # 5.0 flat now drops into 4%-5%
-        else: return "5%+"
+        elif rate <= 5: return "4%-5%"
+        else: return ">5%"
         
     # Convert to numeric just in case it came in as a string
     df['coupon'] = pd.to_numeric(df.get('coupon'), errors='coerce')
@@ -254,7 +254,7 @@ def generate_presentation(advisor_name, client_name="Valued Client"):
     coupon_counts = df.groupby('coupon_bucket')['market_value'].sum()
     
     # 3. Sort so the slices stay in numerical order on the pie chart
-    ordered_coupons = ["<1%", "1%-2%", "2%-3%", "3%-4%", "4%-5%", "5%+"]
+    ordered_coupons = ["<1%", "1%-2%", "2%-3%", "3%-4%", "4%-5%", ">5%"]
     ordered_labels_cpn = [r for r in ordered_coupons if r in coupon_counts.index]
     coupon_counts = coupon_counts.reindex(ordered_labels_cpn)
     
@@ -298,6 +298,58 @@ def generate_presentation(advisor_name, client_name="Valued Client"):
     print("Populating Slide 9...")
     current_slide = next(slides)
 
+    # ========================================================
+    # SLIDE 10: Portfolio Characteristics
+    # ========================================================
+    print("Populating Slide 10...")
+    current_slide = next(slides)
+
+    genterYTW = get_shape(current_slide, "GenterYTW")
+    genterTEY = get_shape(current_slide, "GenterTEY")
+    if genterYTW and genterTEY:
+        update_text_preserve_format(genterTEY, f"{float(genterYTW.text.strip('%'))/(1-clientTaxRate):.2f}%")
+
+    coupon = get_shape(current_slide, "ClientAVGCoupon")
+    if coupon:
+        avg_coupon = df['coupon_clean'].mean()
+        update_text_preserve_format(coupon, f"{avg_coupon:.2f}%")
+
+    ytm = get_shape(current_slide, "ClientYTM")
+    if ytm:
+        avg_ytm = df['yield_to_maturity'].mean()
+        update_text_preserve_format(ytm, f"{avg_ytm:.2f}%")
+
+    ytw = get_shape(current_slide, "ClientYTW")
+    if ytw:
+        avg_ytw = df['yield_to_worst'].mean()
+        update_text_preserve_format(ytw, f"{avg_ytw:.2f}%")
+
+    tey = get_shape(current_slide, "ClientTEY")
+    if tey:
+        avg_tey = avg_ytw/(1-clientTaxRate)
+        update_text_preserve_format(tey, f"{avg_tey:.2f}%")
+
+    effMat = get_shape(current_slide, "ClientEffMat")
+    if effMat:
+        avg_effMat = df['years_to_eff_maturity'].mean()
+        update_text_preserve_format(effMat, f"{avg_effMat:.2f} Years")
+
+
+    effDur = get_shape(current_slide, "ClientEffDur")
+    if effDur:
+        avg_effDur = df['effective_duration'].mean()
+        update_text_preserve_format(effDur, f"{avg_effDur:.2f} Years")
+
+    conv = get_shape(current_slide, "ClientConv")
+    if conv:
+        avg_conv = df['convexity'].mean()
+        update_text_preserve_format(conv, f"{avg_conv:.2f}")
+
+    quality = get_shape(current_slide, "ClientQual")
+    if quality:
+        avg_quality = df['clean_rating'].mode()[0]  # Most common rating
+        update_text_preserve_format(quality, f"{avg_quality}")
+        
     # ========================================================
     # SAVE PRESENTATION
     # ========================================================
