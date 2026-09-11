@@ -1,7 +1,7 @@
 import pandas as pd
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
-from mappings import MUNI_ISSUE_MAP, CORE_INCOME_BUCKETS, CONSOLIDATED_RATINGS_ORDER, MOODYS_TO_SP
+from mappings import MUNI_ISSUE_MAP, CORE_INCOME_BUCKETS, CONSOLIDATED_RATINGS_ORDER, MOODYS_TO_SP, RATING_SCORES, SCORE_TO_RATING
 
 # --- HELPER FUNCTIONS ---
 
@@ -303,51 +303,66 @@ def generate_presentation(advisor_name, client_name="Valued Client", clientTaxRa
     # ========================================================
     print("Populating Slide 10...")
     current_slide = next(slides)
+    
+    # Helper for fast weighted averages
+    def weighted_avg(col_name):
+        valid = df[col_name].notna() & df['market_value'].notna()
+        if not valid.any(): return 0.0
+        return (df.loc[valid, col_name] * df.loc[valid, 'market_value']).sum() / df.loc[valid, 'market_value'].sum()
 
+    # Numeric Averages (Fully Weighted)
+    avg_ytw = weighted_avg('yield_to_worst')
+    avg_ytm = weighted_avg('yield_to_maturity')
+    avg_coupon = weighted_avg('coupon_clean')
+    avg_mat = weighted_avg('years_to_maturity')
+    avg_effMat = weighted_avg('years_to_eff_maturity')
+    avg_effDur = weighted_avg('effective_duration')
+    avg_conv = weighted_avg('convexity')
+    
+    # Text Box Updates
     genterYTW = get_shape(current_slide, "GenterYTW")
     genterTEY = get_shape(current_slide, "GenterTEY")
     if genterYTW and genterTEY:
+        # Assuming GenterYTW text is manually typed in the template and you just calculate the TEY from it
         update_text_preserve_format(genterTEY, f"{float(genterYTW.text.strip('%'))/(1-clientTaxRate):.2f}%")
 
     coupon = get_shape(current_slide, "ClientAVGCoupon")
-    if coupon:
-        avg_coupon = df['coupon_clean'].mean()
-        update_text_preserve_format(coupon, f"{avg_coupon:.2f}%")
+    if coupon: update_text_preserve_format(coupon, f"{avg_coupon:.2f}%")
 
     ytm = get_shape(current_slide, "ClientYTM")
-    if ytm:
-        avg_ytm = df['yield_to_maturity'].mean()
-        update_text_preserve_format(ytm, f"{avg_ytm:.2f}%")
+    if ytm: update_text_preserve_format(ytm, f"{avg_ytm:.2f}%")
 
     ytw = get_shape(current_slide, "ClientYTW")
-    if ytw:
-        avg_ytw = df['yield_to_worst'].mean()
-        update_text_preserve_format(ytw, f"{avg_ytw:.2f}%")
+    if ytw: update_text_preserve_format(ytw, f"{avg_ytw:.2f}%")
 
     tey = get_shape(current_slide, "ClientTEY")
-    if tey:
-        avg_tey = avg_ytw/(1-clientTaxRate)
-        update_text_preserve_format(tey, f"{avg_tey:.2f}%")
+    if tey: update_text_preserve_format(tey, f"{avg_ytw/(1-clientTaxRate):.2f}%")
+
+    statMat = get_shape(current_slide, "ClientStatMat")
+    if statMat: update_text_preserve_format(statMat, f"{avg_mat:.2f} Years")
 
     effMat = get_shape(current_slide, "ClientEffMat")
-    if effMat:
-        avg_effMat = df['years_to_eff_maturity'].mean()
-        update_text_preserve_format(effMat, f"{avg_effMat:.2f} Years")
-
-
+    if effMat: update_text_preserve_format(effMat, f"{avg_effMat:.2f} Years")
+    
     effDur = get_shape(current_slide, "ClientEffDur")
-    if effDur:
-        avg_effDur = df['effective_duration'].mean()
-        update_text_preserve_format(effDur, f"{avg_effDur:.2f} Years")
+    if effDur: update_text_preserve_format(effDur, f"{avg_effDur:.2f} Years")
 
     conv = get_shape(current_slide, "ClientConv")
-    if conv:
-        avg_conv = df['convexity'].mean()
-        update_text_preserve_format(conv, f"{avg_conv:.2f}")
+    if conv: update_text_preserve_format(conv, f"{avg_conv:.2f}")
 
+    # Credit Quality Average (Reverted to Weighted)
     quality = get_shape(current_slide, "ClientQual")
     if quality:
-        avg_quality = df['clean_rating'].mode()[0]  # Most common rating
+        df_rated = df[df['syn_rating'].isin(RATING_SCORES.keys())].copy()
+        df_rated['rating_score'] = df_rated['syn_rating'].map(RATING_SCORES)
+        total_rated_value = df_rated['market_value'].sum()
+        
+        if total_rated_value > 0:
+            avg_score_raw = (df_rated['rating_score'] * df_rated['market_value']).sum() / total_rated_value
+            avg_quality = SCORE_TO_RATING[round(avg_score_raw)]
+        else:
+            avg_quality = "NR"
+            
         update_text_preserve_format(quality, f"{avg_quality}")
         
     # ========================================================

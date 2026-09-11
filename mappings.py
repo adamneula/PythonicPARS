@@ -136,3 +136,14 @@ MOODYS_TO_SP = {
     "Ca": "CC", "C": "C",
     "MIG1": "SP-1", "VMIG1": "SP-1"
 }
+
+# ==========================================
+# 8. AVERAGE QUALITY SCORING MAP
+# ==========================================
+RATING_SCORES = {
+    "AAA": 1, "AA+": 2, "AA": 3, "AA-": 4,
+    "A+": 5, "A": 6, "A-": 7, "BBB+": 8, "BBB": 9, "BBB-": 10,
+    "BB+": 11, "BB": 12, "BB-": 13, "B+": 14, "B": 15, "B-": 16,
+    "CCC+": 17, "CCC": 18, "CCC-": 19, "CC": 20, "C": 21, "D": 22
+}
+SCORE_TO_RATING = {v: k for k, v in RATING_SCORES.items()}

@@ -24,7 +24,7 @@ class Bond:
         self.current_price = bbg_data.get("PX_LAST") or 100.0 # Default to Par
         
         # Helper function to get valid floats
-        def get_valid_float(fields, default=0.0):
+        def get_valid_float(fields, default=None):
             for f in fields:
                 val = bbg_data.get(f)
                 if val is not None and not (isinstance(val, str) and val.startswith("#N/A")):
@@ -62,7 +62,7 @@ class Bond:
         self.effective_maturity_date = bbg_data.get("YAS_WORKOUT_DT") or bbg_data.get("WORKOUT_DT") or self.maturity_date
         
         # Risk (Duration & Convexity)
-        self.effective_duration = get_valid_float(["MID_MOD_DUR_MTY", "DUR_ADJ_MID"])
+        self.effective_duration = get_valid_float(["OAS_DUR", "DUR_ADJ_MID", "MID_MOD_DUR_MTY"])
         self.convexity = get_valid_float(["CNVX_MID"])
         
         # Credit Ratings (Prioritizes Underlying ratings, then Enhanced/Insured, ignores N.S.)
@@ -85,7 +85,7 @@ class Bond:
         # Computed Metrics (Calculated later by Python analytics)
         # ---------------------------------------------------------
         self.market_value = (self.face_value / 100) * self.current_price
-        self.annual_income = self.face_value * (self.coupon / 100)
+        self.annual_income = self.face_value * (self.coupon / 100) if self.coupon is not None else 0.0
         self.portfolio_weight = 0.0
         self.taxable_equivalent_yield = 0.0
 
