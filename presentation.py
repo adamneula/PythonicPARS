@@ -1,6 +1,7 @@
 import pandas as pd
 from pptx import Presentation
 from pptx.chart.data import CategoryChartData
+from pptx.util import Inches, Pt
 from mappings import MUNI_ISSUE_MAP, CORE_INCOME_BUCKETS, CONSOLIDATED_RATINGS_ORDER, MOODYS_TO_SP, RATING_SCORES, SCORE_TO_RATING
 
 # --- HELPER FUNCTIONS ---
@@ -10,7 +11,6 @@ def get_shape(slide, shape_name):
     for shape in slide.shapes:
         if shape.name == shape_name:
             return shape
-    print(f"Warning: Could not find shape '{shape_name}' on this slide.")
     return None
 
 def update_text_preserve_format(shape, new_text):
@@ -54,7 +54,7 @@ def synthesize_rating(row):
 
 def generate_presentation(advisor_name, client_name="Valued Client", clientTaxRate=0.408):
     # 1. Load & Clean Data
-    df = pd.read_excel("Par_Portfolio_Output.xlsx")
+    df = pd.read_excel("Portfolio_Output_20260915_093754.xlsx")
     df['muni_issue_type'] = df['muni_issue_type'].replace(MUNI_ISSUE_MAP)
     
     # 2. Load Template
@@ -297,6 +297,19 @@ def generate_presentation(advisor_name, client_name="Valued Client", clientTaxRa
     # ========================================================
     print("Populating Slide 9...")
     current_slide = next(slides)
+    
+    # Group market value by State Code and sort largest to smallest
+    if 'state_code' in df.columns:
+        state_counts = df.groupby('state_code')['market_value'].sum().sort_values(ascending=False)
+        
+        chart_data_state = CategoryChartData()
+        chart_data_state.categories = state_counts.index.tolist()
+        chart_data_state.add_series('State Breakdown', state_counts.values.tolist())
+        
+        state_chart_shape = get_shape(current_slide, "ClientStateBreakdown")
+        if state_chart_shape and state_chart_shape.has_chart:
+            state_chart_shape.chart.replace_data(chart_data_state)
+            print("Updated ClientStateBreakdown Chart!")
 
     # ========================================================
     # SLIDE 10: Portfolio Characteristics
@@ -365,6 +378,120 @@ def generate_presentation(advisor_name, client_name="Valued Client", clientTaxRa
             
         update_text_preserve_format(quality, f"{avg_quality}")
         
+    # ========================================================
+    # SLIDE 11+: Holdings Detail (Auto-Paginated Table)
+    # ========================================================
+    from pptx.dml.color import RGBColor
+    
+    print("Populating Holdings Detail Slides...")
+    # Search ALL Slide Masters for the specific layout name
+    holdings_layout = None
+    for master in prs.slide_masters:
+        for layout in master.slide_layouts:
+            if layout.name == "HoldingsDetail":
+                holdings_layout = layout
+                break
+        if holdings_layout:
+            break
+            
+    # Absolute fallback if still not found
+    if holdings_layout is None:
+        holdings_layout = prs.slide_masters[-1].slide_layouts[-1]
+        
+    df_sorted = df.sort_values(by='maturity_date', na_position='last')
+    total_mv = df['market_value'].sum()
+    chunk_size = 18
+    
+    headers = [
+        "Face Value", "CUSIP/Ticker", "Name", "Price", "Market Value", "Coupon",
+        "Stated Maturity", "Next Call Date", "YTW", "Rating", "Modified Duration", 
+        "Effective Duration", "Convexity", "% of Portfolio"
+    ]
+    
+    for i in range(0, len(df_sorted), chunk_size):
+        chunk = df_sorted.iloc[i:i+chunk_size]
+        new_slide = prs.slides.add_slide(holdings_layout)
+        
+        # Populate the title placeholder so it becomes solid text that prints
+        if new_slide.shapes.title:
+            new_slide.shapes.title.text = "Client Holdings"
+        
+        rows = len(chunk) + 1
+        cols = 14
+        
+        # Add the table (Moved Top from 1.2 inches up to 0.9 inches, Height increased to 6.1 to stretch down one more row)
+        table_shape = new_slide.shapes.add_table(rows, cols, Inches(0.2), Inches(0.9), Inches(12.9), Inches(6.1))
+        table = table_shape.table
+        
+        # Explicitly define narrow column widths for data cells and give the rest to the Name column
+        col_widths = [
+            Inches(0.65), # Face Value (Reduced to ~80% width)
+            Inches(1.0),  # CUSIP
+            Inches(3.3),  # Name (Absorbed extra space)
+            Inches(0.6),  # Price
+            Inches(0.65), # Market Value 
+            Inches(0.7),  # Coupon (Widened to fit 'n')
+            Inches(0.9),  # Stated Maturity
+            Inches(0.9),  # Next Call Date
+            Inches(0.6),  # YTW
+            Inches(0.6),  # Rating
+            Inches(0.7),  # Modified Duration 
+            Inches(0.8),  # Effective Duration 
+            Inches(0.8),  # Convexity
+            Inches(0.7)   # % of Portfolio 
+        ]
+        for col_idx, width in enumerate(col_widths):
+            table.columns[col_idx].width = width
+        
+        # Format Headers
+        for col_idx, header in enumerate(headers):
+            cell = table.cell(0, col_idx)
+            cell.text = header
+            
+            # Set background color to #59002E
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = RGBColor(0x59, 0x00, 0x2E)
+            
+            for p in cell.text_frame.paragraphs:
+                for r in p.runs:
+                    r.font.size = Pt(9)
+                    r.font.bold = True
+                    r.font.color.rgb = RGBColor(255, 255, 255) # White text for contrast
+                    
+        # Populate Data
+        for row_idx, (_, bond) in enumerate(chunk.iterrows(), start=1):
+            face = f"${bond.get('face_value', 0):,.0f}"
+            cusip = str(bond.get('cusip', ''))
+            name = str(bond.get('security_name', ''))[:28] # Truncate long names slightly
+            price = f"${bond.get('current_price', 0):.2f}"
+            mv = f"${bond.get('market_value', 0):,.0f}"
+            cpn = f"{bond.get('coupon_clean', 0):.3f}%"
+            
+            mat_dt = bond.get('maturity_date')
+            mat = mat_dt.strftime('%m/%d/%Y') if pd.notna(mat_dt) else "N/A"
+            
+            call_dt = bond.get('next_call_date')
+            if pd.notna(call_dt) and call_dt != "NC":
+                call = call_dt if isinstance(call_dt, str) else call_dt.strftime('%m/%d/%Y')
+            else:
+                call = "NC"
+                
+            ytw = f"{bond.get('yield_to_worst', 0):.2f}%"
+            rating = str(bond.get('syn_rating', 'NR'))
+            mod_dur = f"{bond.get('modified_duration', 0):.2f}" if pd.notna(bond.get('modified_duration')) else "N/A"
+            eff_dur = f"{bond.get('effective_duration', 0):.2f}" if pd.notna(bond.get('effective_duration')) else "N/A"
+            conv = f"{bond.get('convexity', 0):.2f}" if pd.notna(bond.get('convexity')) else "N/A"
+            pct = f"{(bond.get('market_value', 0) / total_mv) * 100:.1f}%" if total_mv > 0 else "0.0%"
+            
+            row_data = [face, cusip, name, price, mv, cpn, mat, call, ytw, rating, mod_dur, eff_dur, conv, pct]
+            
+            for col_idx, val in enumerate(row_data):
+                cell = table.cell(row_idx, col_idx)
+                cell.text = str(val)
+                for p in cell.text_frame.paragraphs:
+                    for r in p.runs:
+                        r.font.size = Pt(8) # 8pt font to fit 14 columns
+
     # ========================================================
     # SAVE PRESENTATION
     # ========================================================

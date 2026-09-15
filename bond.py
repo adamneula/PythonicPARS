@@ -63,6 +63,7 @@ class Bond:
         
         # Risk (Duration & Convexity)
         self.effective_duration = get_valid_float(["OAS_DUR", "DUR_ADJ_MID", "MID_MOD_DUR_MTY"])
+        self.modified_duration = get_valid_float(["MID_MOD_DUR_MTY", "DUR_ADJ_MID"])
         self.convexity = get_valid_float(["CNVX_MID"])
         
         # Credit Ratings (Prioritizes Underlying ratings, then Enhanced/Insured, ignores N.S.)
