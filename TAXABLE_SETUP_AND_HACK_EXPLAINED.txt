@@ -1,0 +1,155 @@
+================================================================================
+TAXABLE PORTFOLIO PIPELINE & PRESENTATION: HOW IT IS HACKED TOGETHER RIGHT NOW
+================================================================================
+Date: October 20, 2026
+Files Involved:
+  - mainTaxible.py
+  - bond_taxable.py
+  - bloomberg_client.py
+  - presentationTaxible.py
+  - Portfolio_Output_20261020_093547.xlsx (and future Portfolio_Output_Taxable_*.xlsx)
+  - MQI_Natl_Template.pptx -> PAR_Report_Output_Taxable.pptx
+================================================================================
+
+1. WHY THIS "HACK" WAS CREATED
+--------------------------------------------------------------------------------
+You wanted to immediately "get the numbers down" for a taxable corporate/treasury
+portfolio using your existing PowerPoint template and current Excel export
+structure, without waiting to build a whole new PowerPoint template from scratch.
+
+Because the current template (MQI_Natl_Template.pptx) and the original code were
+designed strictly for municipal bonds, running taxable bonds through them resulted
+in blank/unknown charts, inflated tax-equivalent yields, and Bloomberg lookup issues.
+
+Here is exactly how the data ingestion and presentation generation are currently
+bridged and "hacked" to make everything work right now.
+
+
+2. THE DATA INGESTION HACK (mainTaxible.py & bloomberg_client.py)
+--------------------------------------------------------------------------------
+A. The Bloomberg Yellow-Key Suffix:
+   - What was happening: The original bloomberg_client.py hardcoded every query
+     as "/cusip/<CUSIP> Muni". When querying taxable corporates, Bloomberg
+     sometimes fell back to Corp, but it was unreliable and could fail on Treasuries.
+   - How it's patched: bloomberg_client.py now accepts a `security_type` parameter
+     and an `is_taxable` flag.
+     * Default for mainTaxible.py is SECURITY_TYPE = "Corp".
+     * If you have a mixed portfolio of both Corporates and U.S. Treasuries, set
+       SECURITY_TYPE = None in mainTaxible.py. This makes Bloomberg auto-detect
+       the security class from the CUSIP without forcing "Corp" on Treasuries.
+
+B. What Fields are Pulled from Bloomberg:
+   - Municipal-specific fields like MUNI_TAX_PROV, MUNI_SOURCE, and MUNI_ISSUE_TYP
+     are blank/Unknown for corporates.
+   - For taxable bonds, bloomberg_client.py now pulls:
+     * OAS_SPREAD_MID, YAS_ZSPREAD_MID, YAS_ASW_SPREAD (Credit spreads)
+     * OAS_DUR (Option-adjusted duration for callables)
+     * PAYMENT_RANK (Seniority: "Sr Unsecured", "Subordinated")
+     * SECURITY_TYP, MARKET_SECTOR_DES, INDUSTRY_SECTOR, INDUSTRY_SUBGROUP
+     * CNTRY_OF_RISK, STATE_CODE
+
+C. The Output File Format:
+   - bond_taxable.py creates a TaxableBond object.
+   - To maintain 100% backward compatibility with any script expecting the old
+     columns, bond_taxable.py includes compatibility aliases:
+       * bond.muni_issue_type     = bond.security_type
+       * bond.muni_source         = bond.industry_sector
+       * bond.muni_purpose        = bond.industry_subgroup
+       * bond.credit_enhancements = bond.payment_rank
+       * bond.taxable_equivalent_yield = bond.yield_to_worst
+   - mainTaxible.py computes `portfolio_weight` for every holding post-load
+     and exports to Portfolio_Output_Taxable_<timestamp>.xlsx.
+
+
+3. THE PRESENTATION HACK (presentationTaxible.py)
+--------------------------------------------------------------------------------
+presentationTaxible.py takes either your existing file
+(Portfolio_Output_20261020_093547.xlsx) or any new taxable output and forces
+the numbers into the existing Municipal PowerPoint template (MQI_Natl_Template.pptx).
+
+Here is how each slide's data is remapped:
+
+A. Slide 3 & Slide 4: Structure Analysis & Recommendation ("Bond Types")
+   - In the Muni version: Grouped by `muni_issue_type` (GO vs Revenue).
+   - In your taxable file: `muni_issue_type` is literally "Unknown" for all 14 bonds.
+   - THE HACK:
+     If `muni_issue_type` is Unknown, the script automatically swaps in
+     `industry_sector` (or `security_type`).
+     Instead of a pie chart with a single slice labeled "Unknown", the chart now
+     displays your actual sector weights (e.g. "Industrial" vs "Financial").
+
+B. Slide 3: Income Source ("Income Sources")
+   - In the Muni version: Grouped by `muni_source` (Water, Sewer, Airport, etc.).
+   - In your taxable file: `muni_source` is literally "Unknown" for all 14 bonds.
+   - THE HACK:
+     The script checks `industry_subgroup` and `muni_purpose` (where Bloomberg
+     placed the corporate industry subgroup: "Applications Software", "Semiconductors",
+     "Banking", "REITs", etc.).
+     It groups by this column and caps it to the Top 7 + "Other Industries" so the
+     pie chart remains legible.
+
+C. Slide 5, 6, 7, 8: Maturity, OAM, Coupons, Ratings
+   - These worked in the original output and continue to work as-is.
+   - The rating synthesis function combines BB Composite, S&P, Moody's, and Fitch.
+
+D. Slide 9: State Breakdown
+   - Uses `state_code` from the file. For corporates, this represents issuer
+     headquarters/domicile (CA, NY, VA, etc.).
+
+E. Slide 10: Portfolio Characteristics & The TEY Problem
+   - In the Muni version:
+     Client TEY was calculated as `avg_ytw / (1 - clientTaxRate)`.
+     When run on a 5.86% taxable portfolio, this multiplied the yield up to ~9.9%!
+   - THE HACK:
+     For a taxable corporate portfolio, income is already taxable, so TEY is
+     equal to the actual YTW.
+     presentationTaxible.py sets `ClientTEY` to `avg_ytw` directly (5.86%),
+     keeping the number accurate and honest while filling the template box.
+
+F. Slide 11+: Holdings Detail Table
+   - Retains the exact 14-column layout required by the slide master layout:
+     Face Value | CUSIP | Name | Price | Market Value | Coupon | Stated Maturity |
+     Next Call Date | YTW | Rating | Mod Dur | Eff Dur | Convexity | % Portfolio
+
+G. PPTX File Lock / PermissionError Protection
+   - In presentation.py, if PAR_Report_Output.pptx was already open in PowerPoint,
+     the script crashed with `PermissionError: [Errno 13]`.
+   - presentationTaxible.py saves to `PAR_Report_Output_Taxable.pptx`. If that file
+     is open in PowerPoint, it automatically catches the error and saves to
+     `PAR_Report_Output_Taxable_<timestamp>.pptx` instead of crashing.
+
+
+4. HOW TO RUN IT RIGHT NOW
+--------------------------------------------------------------------------------
+Step 1: Pull live data from Bloomberg (when on a terminal machine):
+    python mainTaxible.py
+    -> This creates Portfolio_Output_Taxable_<timestamp>.xlsx
+
+Step 2: Generate the presentation:
+    python presentationTaxible.py
+    -> This automatically finds the latest taxable output and writes
+       PAR_Report_Output_Taxable.pptx
+
+(Optional): If you want to run the presentation on a specific file (like today's run):
+    python -c "import presentationTaxible; presentationTaxible.generate_taxable_presentation(excel_path='Portfolio_Output_20261020_093547.xlsx')"
+
+
+5. WHAT WOULD MAKE THIS A "CLEAN" (NON-HACKED) PRODUCTION SYSTEM LATER
+--------------------------------------------------------------------------------
+When you have time to formalize this for institutional client pitches:
+
+1. Create a Dedicated Taxable PowerPoint Template:
+   - Rename slide headers from "Muni Structure" to "Sector Allocation & Credit Quality".
+   - Replace the "Income Source" title with "Industry Group Concentration".
+   - Replace the "State Breakdown" slide with a "Top 5 Issuer Concentration" slide
+     (issuers matter far more than state of incorporation for corporates).
+
+2. Add a Dedicated Spread Slide:
+   - Corporates are priced and evaluated on Option-Adjusted Spread (OAS) over
+     Treasuries. Having an OAS distribution chart (e.g. 0-50 bps, 50-100 bps, 100-150 bps)
+     is industry standard.
+
+3. Update Slide 10 Characteristics:
+   - Replace the "TEY" box with "Weighted Average OAS" or "Weighted Benchmark Spread".
+   - Replace "Credit Enhancements" in the holdings table with "Seniority / Capital Rank".
+================================================================================

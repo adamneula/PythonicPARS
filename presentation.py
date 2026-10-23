@@ -54,11 +54,11 @@ def synthesize_rating(row):
 
 def generate_presentation(advisor_name, client_name="Valued Client", clientTaxRate=0.408):
     # 1. Load & Clean Data
-    df = pd.read_excel("Portfolio_Output_20260915_093754.xlsx")
+    df = pd.read_excel("Portfolio_Output_20261020_093547.xlsx")
     df['muni_issue_type'] = df['muni_issue_type'].replace(MUNI_ISSUE_MAP)
     
     # 2. Load Template
-    prs = Presentation("WorkingTemplate.pptx")
+    prs = Presentation("MQI_Natl_Template.pptx")
     slides = iter(prs.slides)
 
     # ========================================================
@@ -327,7 +327,6 @@ def generate_presentation(advisor_name, client_name="Valued Client", clientTaxRa
     avg_ytw = weighted_avg('yield_to_worst')
     avg_ytm = weighted_avg('yield_to_maturity')
     avg_coupon = weighted_avg('coupon_clean')
-    avg_mat = weighted_avg('years_to_maturity')
     avg_effMat = weighted_avg('years_to_eff_maturity')
     avg_effDur = weighted_avg('effective_duration')
     avg_conv = weighted_avg('convexity')
@@ -350,9 +349,6 @@ def generate_presentation(advisor_name, client_name="Valued Client", clientTaxRa
 
     tey = get_shape(current_slide, "ClientTEY")
     if tey: update_text_preserve_format(tey, f"{avg_ytw/(1-clientTaxRate):.2f}%")
-
-    statMat = get_shape(current_slide, "ClientStatMat")
-    if statMat: update_text_preserve_format(statMat, f"{avg_mat:.2f} Years")
 
     effMat = get_shape(current_slide, "ClientEffMat")
     if effMat: update_text_preserve_format(effMat, f"{avg_effMat:.2f} Years")
@@ -500,4 +496,4 @@ def generate_presentation(advisor_name, client_name="Valued Client", clientTaxRa
     print(f"\nDone! Presentation saved to {output_name}")
 
 if __name__ == "__main__":
-    generate_presentation("Adam Neulander", "Dylan Castillo")
+    generate_presentation("Reece Cory", "Valued Client")

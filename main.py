@@ -48,7 +48,7 @@ if __name__ == "__main__":
     import datetime
     
     # The path to your actual Excel sheet
-    EXCEL_PATH = r"H:\_INSTITUTIONAL DIVISION\INTERN FOLDER\Adam Neulander\PythonicPARS\Book1.xlsx"
+    EXCEL_PATH = r"H:\_INSTITUTIONAL DIVISION\INTERN FOLDER\Adam Neulander\PythonicPARS\JacobOct21.xlsx"
     
     # Dynamically generate the output name with a timestamp to avoid PermissionErrors
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
